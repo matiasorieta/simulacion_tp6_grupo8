@@ -7,33 +7,6 @@ def intervalo_entre_arribos():
     scale = 26.272413492938348
     return max(wald.rvs(loc=loc, scale=scale), 0)
 
-def cantidad_hilos_desocupados(instancia: list[int], t: int):
-    return sum(1 for hilo in instancia if hilo <= t)
-
-def bajar_instancias_libres(instancias: list[list[int]], cmi: int, tiempo_actual: int):
-    instancias_libres = []
-    cantidad_a_eliminar = 0
-    suma_tiempos_ociosos = 0
-
-    for instancia in instancias:
-        if cantidad_hilos_desocupados(instancia, tiempo_actual) == len(instancia):
-            instancias_libres.append(instancia)
-        
-    if len(instancias_libres) > 0 and len(instancias) > cmi:
-        cantidad_a_eliminar = len(instancias) - cmi
-        instancias_libres = instancias_libres[:cantidad_a_eliminar]
-        for instancia in instancias_libres:
-            instancias.remove(instancia)
-            suma_tiempos_ociosos += sum(t - tiempo_actual for t in instancia)
-    
-    return cantidad_a_eliminar, suma_tiempos_ociosos
-
-def min_instancia(instancias: list[list[int]], t: int) -> int:
-    return max(range(len(instancias)), key=lambda i: cantidad_hilos_desocupados(instancias[i], t))
-
-def min_hilo(instancia: list[int], t: int) -> int:
-    return instancia.index(min(instancia))
-
 def tiempo_de_atencion():
     p = -1.2013473124553011
     a = 1.8163181809574367
@@ -42,6 +15,15 @@ def tiempo_de_atencion():
     scale = 188.90036583768813
     return max(genhyperbolic.rvs(p=p, a=a, b=b, loc=loc, scale=scale), 0)
 
+def cantidad_hilos_desocupados(instancia: list[int], t: int):
+    return sum(1 for hilo in instancia if hilo <= t)
+
+def min_instancia(instancias: list[list[int]], t: int) -> int:
+    return max(range(len(instancias)), key=lambda i: cantidad_hilos_desocupados(instancias[i], t))
+
+def min_hilo(instancia: list[int], t: int) -> int:
+    return instancia.index(min(instancia))
+
 def cantidad_hilos_ocupados(instancia: list[int], t: int) -> int:
     return sum(1 for hilo in instancia if hilo > t)
 
@@ -49,14 +31,12 @@ def crear_instancia(instancias: list[list[int]], cantidad_hilos: int, tiempo: in
     instancias.append([tiempo] * cantidad_hilos)
 
 def simular(ch: int, cimin: int, cimax: int, tf: int):
-    sci = 0
     tpll = 0
     strt = 0
     nt = 0
-    sto = 0
+    ce = 0
     cia = cimin
     cil_max = cia
-    sie = 0
     instancias = []
 
     for _ in range(cimin):
@@ -66,12 +46,6 @@ def simular(ch: int, cimin: int, cimax: int, tf: int):
         t = tpll
         ia = intervalo_entre_arribos()
         tpll = t + ia
-        bajas, tiempo_ocioso = bajar_instancias_libres(instancias, cimin, t)
-        sto += tiempo_ocioso
-        cia -= bajas
-
-        if bajas > 0:
-            sie += bajas
 
         i = min_instancia(instancias, t)
         j = min_hilo(instancias[i], t)
@@ -80,12 +54,12 @@ def simular(ch: int, cimin: int, cimax: int, tf: int):
         ta = tiempo_de_atencion()
 
         if t < tiempo_comprometido:
+            ce += 1
             strt += (tiempo_comprometido - t) + ta 
-            instancias[i][j] = tiempo_comprometido + ta
+            instancias[i][j] += ta
         else:
-            sto += (t - tiempo_comprometido)
-            instancias[i][j] = t + ta
             strt += ta 
+            instancias[i][j] = t + ta
 
             hilos_ocupados = cantidad_hilos_ocupados(instancias[i], t)
 
@@ -97,16 +71,24 @@ def simular(ch: int, cimin: int, cimax: int, tf: int):
                     cil_max = cia
         
         nt += 1
+        print(f"La ejecución de la simulación va al {"{:.2f}".format(t*100/tf)}%", end="\r")
 
         if t > tf:
             break
 
     trp = strt / nt
-    pto = sto * 100 / t
+    pse = ce * 100/ nt
 
-    print(f"El tiempo de respuesta promedio es: {trp}")
+    print("------------------- Fin de la simulación -------------------")
+    print(f"Para los siguientes valores de entrada:")
+    print(f"- Cantidad de Hilos por instancia:{ch}")
+    print(f"- Cantidad mínima de instancias en ejecución: {cimin}")
+    print(f"- Cantidad máxima de instancais en ejecución: {cimax}")
+    print("\n")
+    print(f"Se obtuvieron los siguientes resultados:")
+    print(f"El tiempo de respuesta promedio en milisegundos es: {trp}")
     print(f"Máxima cantidad de instancias levantadas en simultáneo: {cil_max}")
-    print(f"Promedio de tiempo ocioso: {pto}")
+    print(f"Porcentaje de solicitudes que tuvieron que esperar: {pse}%")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Simulador de llegada de instancias.")
